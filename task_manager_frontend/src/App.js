@@ -3,15 +3,32 @@ import './App.css';
 
 /**
  * Returns a normalized API base URL (no trailing slash).
- * Prefers REACT_APP_API_BASE, then REACT_APP_BACKEND_URL, then defaults to same-origin.
+ *
+ * Preference order:
+ *  1) REACT_APP_API_BASE (explicit full base URL, e.g. https://host:3001)
+ *  2) REACT_APP_BACKEND_URL (legacy/alternative)
+ *  3) Auto-detect backend origin by using same hostname as the frontend, port 3001
+ *     (matches this project's running backend container config).
+ *
+ * Note: We intentionally do NOT default to same-origin '/tasks' because in production
+ * deployments the React app serves HTML at '/tasks', which will break JSON API calls.
  */
 function getApiBaseUrl() {
-  const base =
+  const envBase =
     process.env.REACT_APP_API_BASE ||
     process.env.REACT_APP_BACKEND_URL ||
     '';
 
-  return (base || '').replace(/\/+$/, '');
+  const normalizedEnvBase = (envBase || '').replace(/\/+$/, '');
+  if (normalizedEnvBase) return normalizedEnvBase;
+
+  // Browser-only fallback. In tests/SSR, window may be undefined.
+  if (typeof window !== 'undefined' && window.location) {
+    const { protocol, hostname } = window.location;
+    return `${protocol}//${hostname}:3001`;
+  }
+
+  return '';
 }
 
 /**
